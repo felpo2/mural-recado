@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mural de Recados</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Mural de Recados</h1>
+        <p>Front + Java + JDBC + MySQL</p>
+    </header>
+
+    <main>
+        <form id="form-recado">
+            <label for="autor">Nome</label>
+            <input id="autor" name="autor" maxlength="80" required>
+
+            <label for="mensagem">Recado</label>
+            <textarea id="mensagem" name="mensagem" maxlength="255" required>
+
+            </textarea>
+
+            <button type="submit">Publicar Recado</button>
+
+            <p id="aviso"></p>
+            <h2>Recados Publicados</h2>
+            <section id="listade-recados"></section>
+        </form>
+    </main>
+    
+    <script>
+        const formulario = document.querySelector("#form-recado")
+        const lista = document.querySelector("#lista-recados")
+        const aviso = document.querySelector("#aviso")
+
+        async function carregarRecados() {
+            const resposta = await fetch("/api/recados")
+            const recados = await resposta.json()
+            lista.innerHTML = ""
+
+            for(const recado of recados){
+                const cartao = document.createElement("article")
+                const autor = document.createElement("strong")
+                const mensagem = document.createElement("p")
+
+                autor.textContent = recado.autor
+                mensagem.textContent = recado.mensagem
+                cartao.append(autor, mensagem)
+                lista.appendChild(cartao)
+            
+            }
+        }
+
+        formulario.addEventListener("submit", async function (evento){
+            evento.preventDefault()
+            aviso.textContent = "Salvando..."
+            const dados = URLSearchParams(new FormData(formulario))
+            const resposta = await fetch("/api/recados", {
+                method: "POST",
+                body: dados
+            })
+
+
+            if(resposta.ok){
+                formulario.reset()
+                aviso.textContent = "Recado cadastrado com sucesso!"
+                await carregarRecados()
+            }else{
+                aviso.textContent = "Não foi possível cadastrar o recado!"
+            }
+        })
+
+        carregarRecados()
+
+
+    </script>
+</body>
+</html>
