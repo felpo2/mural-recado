@@ -11,7 +11,7 @@ public class Conexao {
             + "&serverTimezone=America/Sao_Paulo";
 
     private static final String USUARIO = "root";
-    private static final String SENHA = "";
+    private static final String SENHA = "senaisp";
     protected static Connection abrir() throws SQLException {
         return DriverManager.getConnection(URL, USUARIO, SENHA);
     }
