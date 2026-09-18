@@ -17,17 +17,23 @@ import java.util.Map;
 public class Main {
 
     public static final RecadoDAO DAO = new RecadoDAO();
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) {
+        try {
+            testarConexao();
 
-        testarConexao();
+            HttpServer servidor = HttpServer.create(
+                    new InetSocketAddress(8088), 0
+            );
 
-        HttpServer servidor = HttpServer.create(
-                new InetSocketAddress("0.0.0.0", 8080), 0);
-        servidor.createContext("/api/recados", Main::atenderRecados);
-        servidor.createContext("/", Main::abrirPagina);
+            servidor.createContext("/api/recados", Main::atenderRecados);
+            servidor.createContext("/", Main::abrirPagina);
+            servidor.start();
 
-        System.out.println("Mural aberto em http://localhost:8080");
-        System.out.println("Celulares podem acessar pelo IP da rede local na porta 8080.");
+            System.out.println("Mural aberto em http://localhost:8088");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
 
@@ -39,9 +45,9 @@ public class Main {
 
     private static void atenderRecados(HttpExchange troca) throws IOException {
         //permite que o app Android e outros clientes acessem a API
-        troca.getRequestHeaders().set("Acess-Control-Allow-Origin", "*");
-        troca.getRequestHeaders().set("Access-Control-Allow-Origin", "GET, POST OPTIONS");
-        troca.getRequestHeaders().set("Acess-Control-Allow-Origin", "Context-Type");
+        troca.getResponseHeaders().set("Acess-Control-Allow-Origin", "*");
+        troca.getResponseHeaders().set("Access-Control-Allow-Origin", "GET, POST OPTIONS");
+        troca.getResponseHeaders().set("Acess-Control-Allow-Origin", "Context-Type");
 
         try {
             if (troca.getRequestMethod().equals("OPTIONS")) {
@@ -60,18 +66,40 @@ public class Main {
                 responder(troca, 500, "{\"erro\":\"Erro ao acessar o banco\"}");
             }
         }
-        private static void cadastrar(HttpExchange troca) throws IOException, SQLException{
-            Map<String, String> dados = lerFormulario(troca);
-            String autor = dados.getOrDefault("autor", "").trim();
-            String mensagem = dados.getOrDefault("mensagem", "").trim();
 
-            if (autor.isEmpty() || mensagem.isEmpty()){
-                responder(troca, 400, "{\"erro\":\"Preencher todos os campos\"}");
-                return;
-            }
-            DAO.cadastrar(new Recado(0, autor, mensagem));
-            responder(troca, 201, "{\"mensagem\":\"Recado cadastrado\"}");
+
+    private static void cadastrar(HttpExchange troca)
+            throws IOException, SQLException {
+
+        Map<String, String> dados = lerFormulario(troca);
+
+        String autor = dados.getOrDefault("autor", "").trim();
+        String mensagem = dados.getOrDefault("mensagem", "").trim();
+
+        System.out.println("AUTOR: " + autor);
+        System.out.println("MENSAGEM: " + mensagem);
+
+        if (autor.isEmpty() || mensagem.isEmpty()) {
+            responder(
+                    troca,
+                    400,
+                    "{\"erro\":\"Preencher todos os campos\"}"
+            );
+            return;
         }
+
+        DAO.cadastrar(new Recado(0, autor, mensagem));
+
+        System.out.println("RECADO INSERIDO!");
+
+        responder(
+                troca,
+                201,
+                "{\"mensagem\":\"Recado cadastrado\"}"
+        );
+    }
+
+
         private static void listar(HttpExchange troca) throws IOException, SQLException{
             List<Recado> recados = DAO.listar();
             //StringBuilder: classe para construir e alterar textos sem criar uma nova String a cada mudança
@@ -86,22 +114,41 @@ public class Main {
             json.append("]");
             responder(troca, 200, json.toString());
         }
-        private static Map<String, String> lerFormulario(HttpExchange troca) throws IOException {
-            String corpo = new String(
-                    troca.getRequestBody().readAllBytes(),
+
+
+    private static Map<String, String> lerFormulario(HttpExchange troca) throws IOException {
+
+        String corpo = new String(
+                troca.getRequestBody().readAllBytes(),
+                StandardCharsets.UTF_8
+        );
+
+        System.out.println("CORPO RECEBIDO: " + corpo);
+
+        Map<String, String> dados = new HashMap<>();
+
+        for (String campo : corpo.split("&")) {
+
+            String[] partes = campo.split("=", 2);
+
+            String nome = URLDecoder.decode(
+                    partes[0],
                     StandardCharsets.UTF_8
             );
-            Map<String, String> dados = new HashMap<>();
-            for (String campo : corpo.split("&")) {
-                String[] partes = corpo.split("=", 2);
-                String nome = URLDecoder.decode(partes[0], StandardCharsets.UTF_8);
-                String valor = partes.length == 2
-                        ? URLDecoder.decode(partes[1], StandardCharsets.UTF_8)
-                        : "";
-                dados.put(nome, valor);
-            }
-            return dados;
+
+            String valor = partes.length == 2
+                    ? URLDecoder.decode(partes[1], StandardCharsets.UTF_8)
+                    : "";
+
+            dados.put(nome, valor);
         }
+
+        System.out.println("DADOS: " + dados);
+
+        return dados;
+    }
+
+
         private static void abrirPagina(HttpExchange troca) throws IOException{
         if (!troca.getRequestMethod().equals("GET")){
             responder(troca, 405, "Método não permitido", "text/plain");
@@ -113,7 +160,7 @@ public class Main {
                 return;
             }
             byte[] pagina = arquivo.readAllBytes();
-            troca.getRequestHeaders().set("Context-Type", "text/html; charset=UTF-8");
+            troca.getResponseHeaders().set("Context-Type", "text/html; charset=UTF-8");
             troca.sendResponseHeaders(200, pagina.length);
             troca.getResponseBody().write(pagina);
             troca.close();
@@ -126,7 +173,7 @@ public class Main {
         private static void responder(
                 HttpExchange troca, int status, String conteudo, String tipo) throws IOException{
                 byte[] resposta = conteudo.getBytes(StandardCharsets.UTF_8);
-                troca.getRequestHeaders().set("Context-Type", tipo + "; charset=UTF_8");
+                troca.getResponseHeaders().set("Context-Type", tipo + "; charset=UTF_8");
                 troca.sendResponseHeaders(status, resposta.length);
                 troca.getResponseBody().write(resposta);
                 troca.close();
